@@ -79,7 +79,7 @@ export default function ConfiguracoesPage() {
                   <button
                     onClick={() => save(s.key)}
                     disabled={saving[s.key]}
-                    className="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700 disabled:opacity-50"
                   >
                     {saving[s.key] ? 'Salvando...' : saved[s.key] ? 'Salvo!' : 'Salvar'}
                   </button>

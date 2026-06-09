@@ -7,6 +7,8 @@ import settingsRoutes from './settings.js'
 import patientsRoutes from './patients.js'
 import reservationsRoutes from './reservations.js'
 import paymentsRoutes from './payments.js'
+import cancellationsRoutes from './cancellations.js'
+import repassesRoutes from './repasses.js'
 
 const routes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(healthRoute)
@@ -24,8 +26,11 @@ const routes: FastifyPluginAsync = async (fastify) => {
   // Sprint 3
   await fastify.register(paymentsRoutes)
 
-  // Sprint 4: cancellations
-  // Sprint 5: repasses, reports
+  // Sprint 4
+  await fastify.register(cancellationsRoutes)
+
+  // Sprint 5
+  await fastify.register(repassesRoutes)
 }
 
 export default routes

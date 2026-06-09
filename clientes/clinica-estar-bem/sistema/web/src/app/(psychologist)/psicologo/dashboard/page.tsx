@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<Reservation['status'], string> = {
   confirmed: 'Confirmada',
   cancelled: 'Cancelada',
   completed: 'Concluída',
-  no_show: 'No-show',
+  no_show: 'Ausência',
 }
 
 const STATUS_CLASS: Record<Reservation['status'], string> = {

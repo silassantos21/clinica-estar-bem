@@ -160,59 +160,74 @@
 
 ---
 
-## Sprint 4 — Cancelamentos e No-show
+## Sprint 4 — Cancelamentos e No-show ✅
 **Duração:** 1 semana
-**Entrega:** Cancelamento aplica regra correta (penalidade ou reembolso) conforme ator e horário; no-show retém automaticamente
+**Concluído em:** 2026-06-08
 
 ### Tarefas
 
 **API**
-- [ ] `POST /reservations/:id/cancel` — recebe `reason` (patient_request | psychologist_decision | clinic_decision)
+- [x] `POST /reservations/:id/cancel` — recebe `reason` (patient_request | psychologist_decision | clinic_decision)
   - Lê `settings.cancellation_tolerance_hours`
   - Aplica lógica de penalidade ou reembolso
   - Cria registro em `cancellations`
   - Cria `repasses` se houver split a pagar
   - Chama reembolso via MP se aplicável
-- [ ] Permissões de cancelamento por role e reason (conforme matriz)
+- [x] `GET /reservations/:id/cancel-preview?reason=...` — retorna breakdown financeiro antes de confirmar
+- [x] Permissões de cancelamento por role e reason (conforme matriz)
+- [x] `POST /cron/no-show` — endpoint manual protegido por `CRON_SECRET` (para testes e fallback)
 
-**Cron (Railway Cron Job)**
-- [ ] Job a cada 15 min: busca reservas `confirmed` com `end_at < now` → processa como no-show
+**Cron (Supabase pg_cron)**
+- [x] Job a cada 15 min via `pg_cron` no próprio Supabase (migration: `20260608000001_no_show_cron.sql`)
   - `payments.status = retained`
   - `reservations.status = no_show`
   - Cria `cancellations` com `reason = no_show`
   - Cria `repasses` com split do psicólogo
 
 **Frontend**
-- [ ] Botão "Cancelar reserva" no detalhe
-- [ ] Modal de cancelamento: selecionar motivo (patient_request ou psychologist_decision)
-- [ ] Exibir breakdown da penalidade antes de confirmar (se < tolerância)
-- [ ] Exibir valor do reembolso se elegível
+- [x] Botão "Cancelar reserva" no modal de detalhe (psicólogo e admin)
+- [x] Modal de cancelamento: motivos corretos por role (psicólogo: patient_request | psychologist_decision; admin: patient_request | clinic_decision)
+- [x] Breakdown da penalidade antes de confirmar (se < tolerância)
+- [x] Exibição de reembolso integral se elegível
+- [x] Loading skeleton nas etapas Sala e Paciente do wizard de nova reserva
 
 **Critério de aceite:** Cancelamento dentro da janela → sem reembolso, split registrado. Cancelamento fora → reembolso processado. Reserva expirada sem ação → no-show no cron seguinte.
 
+**Notas técnicas**
+- Cron roda no Supabase (pg_cron), não no Railway — Railway não está em uso ainda
+- `CRON_SECRET` adicionado ao `api/.env.example` — necessário adicionar no `api/.env` local
+- Preview financeiro busca `penalty_split_rate` do psicólogo e `cancellation_tolerance_hours` das settings via API
+
 ---
 
-## Sprint 5 — Repasses e Relatórios
+## Sprint 5 — Repasses e Relatórios ✅
 **Duração:** 1 semana
-**Entrega:** Admin gerencia repasses manualmente; relatórios financeiros disponíveis
+**Concluído em:** 2026-06-08
 
 ### Tarefas
 
-**API**
-- [ ] `POST /reservations/:id/complete` (admin) — marca sessão como `completed`, cria `repasse` com valor integral do psicólogo
-- [ ] `GET /repasses` — admin vê todos; psicólogo vê só os próprios (filtros: status, psicólogo, período)
-- [ ] `PUT /repasses/:id/pay` (admin) — marca repasse como `paid`, registra `paid_by` e `notes`
-- [ ] `GET /reports/financial?month=&year=` — receita bruta, retido, reembolsado, repasses pagos/pendentes
-- [ ] `GET /reports/rooms?start=&end=` — horas reservadas vs disponíveis por sala
-- [ ] `GET /reports/psychologists?start=&end=` — reservas, cancelamentos, no-shows, repasses por psicólogo
+**API** (`api/src/routes/repasses.ts`)
+- [x] `POST /reservations/:id/complete` (admin) — marca sessão como `completed`, cria `repasse` com valor integral do psicólogo (idempotente)
+- [x] `GET /repasses` — admin vê todos; psicólogo vê só os próprios (filtros: status, psicólogo)
+- [x] `PUT /repasses/:id/pay` (admin) — marca repasse como `paid`, registra `paid_by` e `notes`
+- [x] `GET /reports/financial?month=&year=` — receita bruta, retido, reembolsado, repasses pagos/pendentes
+- [x] `GET /reports/rooms?start=&end=` — horas reservadas vs disponíveis por sala, taxa de ocupação
+- [x] `GET /reports/psychologists?start=&end=` — reservas, concluídas, cancelamentos, ausências, repasses por psicólogo
 
 **Frontend**
-- [ ] Tela de repasses: lista com filtros, ação "Marcar como pago" com campo de observação
-- [ ] Dashboard financeiro admin (cards com totais + tabela detalhada)
-- [ ] Relatório de ocupação por sala (tabela + barra visual simples)
-- [ ] Relatório por psicólogo
+- [x] `/admin/repasses` — lista com filtros (status, psicólogo), total pendente em destaque, modal "Marcar como pago" com observação
+- [x] `/admin/relatorios` — seletor mês/ano, cards financeiros, barra de ocupação por sala, tabela por psicólogo
+- [x] `/psicologo/repasses` — lista com filtro de status e paciente, cards "A receber / Já recebido"
+- [x] `/admin/dashboard` — cards com dados reais (reservas hoje, receita do mês, repasses pendentes, ocupação)
+- [x] `/admin/reservas` — botão "Confirmar sessão concluída" no modal (aparece quando `confirmed` + `end_at` no passado)
 
 **Critério de aceite:** Admin confirma sessão → repasse aparece como pendente. Admin marca como pago. Relatório mensal bate com os registros.
+
+**Notas técnicas**
+- Migration `20260608000002_repasses_created_at.sql` — adiciona `created_at` na tabela `repasses` (rodar no Supabase SQL Editor)
+- Ausência é gerada automaticamente pelo pg_cron (a cada 15 min) — admin não precisa fazer nada; se a sessão passar sem ser confirmada, vira ausência com retenção de pagamento e split de penalidade
+- Botões primários do sistema (admin e psicólogo) padronizados em `brand-600` (#C01C63)
+- Label "no-show" substituído por "Ausência" em todo o frontend (valor interno `no_show` no banco/API permanece)
 
 ---
 

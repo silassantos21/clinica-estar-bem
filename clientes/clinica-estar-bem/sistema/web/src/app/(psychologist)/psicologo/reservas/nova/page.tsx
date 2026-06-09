@@ -36,6 +36,8 @@ export default function NovaReservaPage() {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null)
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [loadingRooms, setLoadingRooms] = useState(true)
+  const [loadingPatients, setLoadingPatients] = useState(false)
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,17 +46,21 @@ export default function NovaReservaPage() {
 
   useEffect(() => {
     async function init() {
-      const me = await api.get<Me>('/me')
-      if (me.psychologistId) {
-        const data = await api.get<RoomWithRate[]>(`/psychologists/${me.psychologistId}/rooms`)
-        setRooms(data.filter((r) => r.active))
-      } else {
-        const data = await api.get<RoomWithRate[]>('/rooms')
-        setRooms(
-          data
-            .filter((r: any) => r.active)
-            .map((r: any) => ({ ...r, effective_rate: r.hourly_rate })),
-        )
+      try {
+        const me = await api.get<Me>('/me')
+        if (me.psychologistId) {
+          const data = await api.get<RoomWithRate[]>(`/psychologists/${me.psychologistId}/rooms`)
+          setRooms(data.filter((r) => r.active))
+        } else {
+          const data = await api.get<RoomWithRate[]>('/rooms')
+          setRooms(
+            data
+              .filter((r: any) => r.active)
+              .map((r: any) => ({ ...r, effective_rate: r.hourly_rate })),
+          )
+        }
+      } finally {
+        setLoadingRooms(false)
       }
     }
     init()
@@ -73,7 +79,10 @@ export default function NovaReservaPage() {
 
   useEffect(() => {
     if (step === 'paciente' && patients.length === 0) {
-      api.get<Patient[]>('/patients').then(setPatients)
+      setLoadingPatients(true)
+      api.get<Patient[]>('/patients')
+        .then(setPatients)
+        .finally(() => setLoadingPatients(false))
     }
   }, [step])
 
@@ -234,7 +243,13 @@ export default function NovaReservaPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sala</label>
-                {rooms.length === 0 ? (
+                {loadingRooms ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                ) : rooms.length === 0 ? (
                   <p className="text-sm text-gray-500">Nenhuma sala ativa cadastrada.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-2">
@@ -330,7 +345,13 @@ export default function NovaReservaPage() {
         {step === 'paciente' && (
           <div>
             <h2 className="text-base font-semibold text-gray-900 mb-4">Paciente</h2>
-            {patients.length === 0 ? (
+            {loadingPatients ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : patients.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-sm text-gray-500 mb-3">Nenhum paciente cadastrado.</p>
                 <a href="/psicologo/pacientes" className="text-sm font-medium text-brand-600 underline">

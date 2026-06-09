@@ -252,6 +252,46 @@ Sempre que reiniciar o ngrok, atualizar em dois lugares:
 
 ---
 
+## Fluxo de Ausência (no-show)
+
+### Como uma ausência é gerada
+
+O sistema **não exige ação manual** do admin para registrar uma ausência. O fluxo é:
+
+1. Reserva fica `confirmed` (pagamento confirmado)
+2. Horário da sessão passa sem o admin marcar como concluída
+3. O **pg_cron** (Supabase, a cada 15 min) detecta `confirmed` com `end_at < NOW()`
+4. Automaticamente: status → `no_show`, pagamento → `retained`, repasse criado com `penalty_split_rate`
+
+### O admin tem duas ações possíveis ao final de cada sessão
+
+| Ação | Como fazer | Resultado |
+|---|---|---|
+| Sessão aconteceu normalmente | Modal da reserva → "Confirmar sessão concluída" | Status `completed`, repasse pelo valor integral |
+| Paciente não compareceu | Não fazer nada | Cron marca como `Ausência` automático, pagamento retido, repasse pelo split |
+
+### Testar sem esperar o cron
+
+Rodar o SQL manualmente no Supabase SQL Editor (mesmo lógica do cron):
+```sql
+-- Verificar o que seria processado
+SELECT r.id, r.status, r.end_at FROM reservations r
+WHERE r.status = 'confirmed' AND r.end_at < NOW();
+```
+
+Ou chamar o endpoint manual (requer `CRON_SECRET` no header):
+```bash
+curl -X POST http://localhost:3001/cron/no-show \
+  -H "Authorization: Bearer <CRON_SECRET>"
+```
+
+### Nomenclatura
+
+- Valor no banco/API: `no_show` (imutável — base de dados e integrações dependem disso)
+- Exibição no frontend: **"Ausência"** (alterado em 2026-06-08; antes era "No-show")
+
+---
+
 ## Next.js + Supabase SSR — Problemas de sessão pós-login
 
 ### Redirect loop após login
