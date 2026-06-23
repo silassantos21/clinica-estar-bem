@@ -1,16 +1,4 @@
-import nodemailer from 'nodemailer'
-
-function createTransport() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
-}
+import { Resend } from 'resend'
 
 function credenciaisHtml(name: string, email: string, password: string, appUrl: string): string {
   return `<!DOCTYPE html>
@@ -111,16 +99,23 @@ export async function sendCredentialsEmail(
   name: string,
   password: string,
 ): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.error('[Mailer] RESEND_API_KEY não configurada — e-mail não enviado')
+    return
+  }
+
   const appUrl = process.env.FRONTEND_URL ?? ''
+  const resend = new Resend(apiKey)
 
   try {
-    const transporter = createTransport()
-    await transporter.sendMail({
-      from: `"Núcleo Estar Bem" <${process.env.SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: 'Núcleo Estar Bem <onboarding@resend.dev>',
       to,
       subject: 'Seus dados de acesso — Núcleo Estar Bem',
       html: credenciaisHtml(name, to, password, appUrl),
     })
+    if (error) throw new Error(error.message)
     console.log(`[Mailer] Credenciais enviadas para ${to}`)
   } catch (e) {
     console.error('[Mailer] Falha ao enviar e-mail de credenciais:', e)
