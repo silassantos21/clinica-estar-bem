@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify'
 import { requireAdmin, requireAuth } from '../middlewares/guards.js'
-import { sendWhatsApp, msgCredenciais } from '../services/notifications.js'
+import { sendCredentialsEmail } from '../services/mailer.js'
 
 const professionalsRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /professionals — lista todos com dados do usuário vinculado
@@ -55,10 +55,8 @@ const professionalsRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: profError.message })
     }
 
-    // Envia credenciais via WhatsApp — fire-and-forget
-    if (phone) {
-      sendWhatsApp(phone, msgCredenciais(name, email, password))
-    }
+    // Envia credenciais por e-mail — fire-and-forget
+    sendCredentialsEmail(email, name, password)
 
     return reply.status(201).send(data)
   })
