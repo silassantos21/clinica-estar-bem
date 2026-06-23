@@ -18,6 +18,15 @@ export function getWAStatus(): { connected: boolean; qrDataUrl?: string } {
   return { connected, qrDataUrl: qrDataUrl ?? undefined }
 }
 
+export async function requestPairingCode(phone: string): Promise<string> {
+  if (!sock) throw new Error('WhatsApp não inicializado')
+  if (connected) throw new Error('WhatsApp já está conectado')
+  const normalized = normalizePhone(phone)
+  if (!normalized) throw new Error('Número inválido')
+  const code = await sock.requestPairingCode(normalized)
+  return code
+}
+
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
   if (digits.length < 10) return ''
