@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import sgMail from '@sendgrid/mail'
 
 function credenciaisHtml(name: string, email: string, password: string, appUrl: string): string {
   return `<!DOCTYPE html>
@@ -99,23 +99,24 @@ export async function sendCredentialsEmail(
   name: string,
   password: string,
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
+  const apiKey = process.env.SENDGRID_API_KEY
   if (!apiKey) {
-    console.error('[Mailer] RESEND_API_KEY não configurada — e-mail não enviado')
+    console.error('[Mailer] SENDGRID_API_KEY não configurada — e-mail não enviado')
     return
   }
 
+  const from = process.env.SENDGRID_FROM ?? process.env.SMTP_USER ?? ''
   const appUrl = process.env.FRONTEND_URL ?? ''
-  const resend = new Resend(apiKey)
+
+  sgMail.setApiKey(apiKey)
 
   try {
-    const { error } = await resend.emails.send({
-      from: 'Núcleo Estar Bem <onboarding@resend.dev>',
+    await sgMail.send({
+      from: { name: 'Núcleo Estar Bem', email: from },
       to,
       subject: 'Seus dados de acesso — Núcleo Estar Bem',
       html: credenciaisHtml(name, to, password, appUrl),
     })
-    if (error) throw new Error(error.message)
     console.log(`[Mailer] Credenciais enviadas para ${to}`)
   } catch (e) {
     console.error('[Mailer] Falha ao enviar e-mail de credenciais:', e)
