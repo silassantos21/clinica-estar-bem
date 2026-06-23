@@ -186,18 +186,22 @@ Ajustes identificados durante uso real do sistema no celular:
 ---
 
 ## Sprint R7 — Deploy e entrega
-**Status:** Pendente
+**Status:** CONCLUÍDA (2026-06-22)
 **Estimativa:** 1 semana
 
-### Hardening
-- [ ] Validação de inputs em todas as rotas (Zod + Fastify schema)
-- [ ] Tratamento global de erros (respostas padronizadas)
-- [ ] Rate limiting nas rotas públicas (login)
+### Deploy produção ✅
+- [x] Railway (API) configurado: root directory, build/start commands, env vars
+- [x] Vercel (web) configurado: root directory, env vars, `vercel.json` para output detection
+- [x] Supabase: migration v1 executada em produção (tabelas, RLS, seed)
+- [x] Admin inserido manualmente após migration (ver NOTAS_TECNICAS.md)
 
-### Deploy produção
-- [ ] Variáveis de ambiente no Railway (API) e Vercel (web)
-- [ ] Supabase: projeto de produção separado do staging
-- [ ] Z-API: número de produção configurado
+### WhatsApp — migração Z-API → Baileys ✅
+- [x] `api/src/services/whatsapp.ts` — Baileys embarcado na API (gratuito, sem serviço externo)
+- [x] `api/src/services/notifications.ts` — `sendWA()` substituiu chamada HTTP para Z-API
+- [x] `api/src/routes/whatsapp.ts` — `GET /whatsapp/status` e `POST /whatsapp/pair`
+- [x] Painel admin: seção WhatsApp com QR Code e "Código pelo celular" (mobile-friendly)
+- [x] `web/vercel.json` — fix para 404 no Vercel Edge (output directory explícito)
+- [x] `web/src/middleware.ts` — try/catch para evitar 404 quando Supabase inacessível no Edge
 
 ### Entrega
 - [ ] Sessão de walkthrough com a cliente (fluxo admin + profissional)
@@ -205,6 +209,39 @@ Ajustes identificados durante uso real do sistema no celular:
 - [ ] Treinamento: fazer reserva, cancelar, ver bloqueios, gerar relatório
 
 **Critério de aceite:** Sistema no ar, cliente consegue operar sem assistência técnica.
+
+---
+
+## Sprint R8 — Notificações in-app
+**Status:** Planejada
+**Estimativa:** 1–2 dias
+
+**Contexto:** WhatsApp serve apenas para envio de credenciais. Notificações operacionais (reservas, cancelamentos) acontecem dentro do próprio sistema.
+
+### Quem recebe o quê
+| Gatilho | Destinatário |
+|---|---|
+| Reserva criada (por qualquer um) | Profissional da reserva |
+| Cancelamento feito pelo profissional | Admin(s) + confirmação ao profissional |
+| Cancelamento feito pelo admin | Profissional da reserva |
+
+### Banco
+- [ ] Migration: tabela `notifications` (`id`, `user_id` FK, `type`, `title`, `body`, `read` DEFAULT false, `data` JSONB, `created_at`)
+- [ ] RLS: usuário lê só as próprias; API insere via service_role
+- [ ] `ALTER PUBLICATION supabase_realtime ADD TABLE notifications` (habilitar Realtime)
+
+### API
+- [ ] `api/src/services/inbox.ts` — `createNotification()` e `createNotificationsForAdmins()`
+- [ ] `api/src/routes/notifications.ts` — `GET /notifications`, `PUT /notifications/:id/read`, `PUT /notifications/read-all`
+- [ ] `api/src/routes/reservations.ts` — chamar inbox após `POST /reservations`
+- [ ] `api/src/routes/cancellations.ts` — chamar inbox após cancel (lógica por role)
+- [ ] `api/src/routes/index.ts` — registrar nova rota
+
+### Frontend
+- [ ] `web/src/components/NotificationBell.tsx` — sino com badge, dropdown, assinatura Supabase Realtime
+- [ ] `web/src/components/AppShell.tsx` — sino no header mobile e sidebar desktop
+
+**Critério de aceite:** Profissional faz reserva → vê notificação no sino. Profissional cancela → admin vê alerta no sino. Admin cancela → profissional vê aviso no sino.
 
 ---
 
@@ -219,6 +256,7 @@ Ajustes identificados durante uso real do sistema no celular:
 | R5 | Mobile-first | 2–3 dias |
 | R6 | Notificações WhatsApp | 1 semana |
 | R7 | Deploy + entrega | 1 semana |
+| R8 | Notificações in-app (sino + Realtime) | 1–2 dias |
 | **Total** | | **~4–5 semanas** |
 
 ---

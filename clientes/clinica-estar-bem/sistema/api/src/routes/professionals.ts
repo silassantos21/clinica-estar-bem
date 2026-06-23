@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify'
 import { requireAdmin, requireAuth } from '../middlewares/guards.js'
+import { sendWhatsApp, msgCredenciais } from '../services/notifications.js'
 
 const professionalsRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /professionals — lista todos com dados do usuário vinculado
@@ -52,6 +53,11 @@ const professionalsRoutes: FastifyPluginAsync = async (fastify) => {
     if (profError) {
       await fastify.supabase.auth.admin.deleteUser(userId)
       return reply.status(400).send({ error: profError.message })
+    }
+
+    // Envia credenciais via WhatsApp — fire-and-forget
+    if (phone) {
+      sendWhatsApp(phone, msgCredenciais(name, email, password))
     }
 
     return reply.status(201).send(data)

@@ -57,6 +57,10 @@ UNIQUE(psychologist_id, room_id)
 **`cancellations`**
 `id` · `reservation_id` FK (1:1) · `cancelled_by` FK → users · `reason` ENUM(patient_request | psychologist_decision | clinic_decision | no_show) · `cancelled_at` DATETIME · `hours_before_start` DECIMAL · `penalty_applied` BOOL · `clinic_amount` DECIMAL · `psychologist_amount` DECIMAL
 
+**`notifications`**
+`id` · `user_id` FK → users · `type` TEXT · `title` TEXT · `body` TEXT · `read` BOOL DEFAULT false · `data` JSONB (nullable) · `created_at`
+> Entregue via Supabase Realtime. API insere com service_role (bypassa RLS); usuário lê só as próprias via policy SELECT.
+
 **`repasses`**
 `id` · `reservation_id` FK · `psychologist_id` FK · `amount` DECIMAL · `status` ENUM(pending | paid) · `paid_at` · `paid_by` FK → users · `notes`
 

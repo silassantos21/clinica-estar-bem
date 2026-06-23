@@ -47,3 +47,15 @@ export function msgLembrete(name: string, room: string, startAt: string): string
     `_Núcleo Estar Bem_`
   )
 }
+
+export function msgCredenciais(name: string, email: string, password: string): string {
+  const appUrl = process.env.FRONTEND_URL ?? ''
+  return (
+    `Olá, ${name}! 👋 Seu acesso ao Núcleo Estar Bem foi criado.\n\n` +
+    `📧 *Email:* ${email}\n` +
+    `🔑 *Senha:* ${password}\n` +
+    (appUrl ? `🔗 ${appUrl}\n\n` : '\n') +
+    `Recomendamos alterar a senha após o primeiro acesso.\n\n` +
+    `_Núcleo Estar Bem_`
+  )
+}

@@ -393,6 +393,39 @@ Com `darkMode: 'class'` e sem toggle, as classes `dark:bg-gray-900`, `dark:text-
 
 ---
 
+## Supabase Realtime — Assinatura no frontend
+
+Para escutar INSERTs em tempo real numa tabela (ex: `notifications`), usar `createBrowserClient` do `@supabase/ssr` (já disponível no projeto):
+
+```typescript
+// Client Component
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+)
+
+const channel = supabase
+  .channel('notifications')
+  .on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+    (payload) => { /* payload.new é o registro inserido */ },
+  )
+  .subscribe()
+
+// Cleanup no useEffect return
+return () => { supabase.removeChannel(channel) }
+```
+
+**Pré-requisitos:**
+- Tabela com Realtime habilitado na migration: `ALTER PUBLICATION supabase_realtime ADD TABLE notifications;`
+- RLS com policy SELECT para o usuário ler as próprias linhas; API insere via `service_role` (bypassa RLS)
+- Filtro `filter: \`user_id=eq.${userId}\`` — necessário para que o Supabase aplique RLS no canal e o usuário receba apenas as próprias notificações
+
+**Por que não usar polling?** Realtime entrega a notificação em ~200ms via WebSocket. Polling a cada 30s gera latência e queima requisições desnecessárias.
+
+---
+
 ## CSS — SVG com fundo branco sobre fundo branco
 
 **Problema:** Logos em SVG com fundo branco embutido ficam com retângulo branco visível quando o background da página também é branco/claro.
