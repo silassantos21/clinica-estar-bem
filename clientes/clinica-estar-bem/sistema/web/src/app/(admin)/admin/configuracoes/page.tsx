@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api } from '@/lib/api'
 
 type Setting = { key: string; value: string; updated_at: string }
+type WAStatus = { connected: boolean; qrDataUrl?: string }
 
 const labels: Record<string, { label: string; hint: string; type: string }> = {
   cancellation_tolerance_hours: {
@@ -21,6 +22,9 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [waStatus, setWaStatus] = useState<WAStatus | null>(null)
+  const [waLoading, setWaLoading] = useState(true)
+
   const load = async () => {
     try {
       const data = await api.get<Setting[]>('/settings')
@@ -33,7 +37,22 @@ export default function ConfiguracoesPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  const loadWA = useCallback(async () => {
+    setWaLoading(true)
+    try {
+      const data = await api.get<WAStatus>('/whatsapp/status')
+      setWaStatus(data)
+    } catch {
+      setWaStatus(null)
+    } finally {
+      setWaLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    loadWA()
+  }, [loadWA])
 
   const save = async (key: string) => {
     setSaving((s) => ({ ...s, [key]: true }))
@@ -60,7 +79,7 @@ export default function ConfiguracoesPage() {
       {loading ? (
         <p className="text-sm text-gray-500">Carregando...</p>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-8">
           {settings.map((s) => {
             const meta = labels[s.key] ?? { label: s.key, hint: '', type: 'text' }
             return (
@@ -89,6 +108,67 @@ export default function ConfiguracoesPage() {
           })}
         </div>
       )}
+
+      {/* WhatsApp */}
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">WhatsApp</h2>
+      <p className="text-sm text-gray-500 mb-4">Notificações automáticas para os profissionais</p>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        {waLoading ? (
+          <p className="text-sm text-gray-500">Verificando status...</p>
+        ) : waStatus === null ? (
+          <p className="text-sm text-red-600">Não foi possível verificar o status do WhatsApp.</p>
+        ) : waStatus.connected ? (
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+              Conectado
+            </span>
+            <button
+              onClick={loadWA}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Atualizar
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                Desconectado
+              </span>
+              <button
+                onClick={loadWA}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Atualizar
+              </button>
+            </div>
+
+            {waStatus.qrDataUrl ? (
+              <div>
+                <p className="text-sm text-gray-700 mb-3">
+                  Escaneie com o WhatsApp do número da clínica para ativar as notificações:
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={waStatus.qrDataUrl}
+                  alt="QR Code WhatsApp"
+                  className="w-48 h-48 border border-gray-200 rounded-xl"
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  O QR expira em ~20 segundos. Clique em "Atualizar" se expirar.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                O servidor ainda está gerando o QR Code. Aguarde alguns segundos e clique em "Atualizar".
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

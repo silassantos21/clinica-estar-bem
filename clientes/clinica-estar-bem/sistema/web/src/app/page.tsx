@@ -15,7 +15,7 @@ export default async function RootPage() {
     .single()
 
   if (profile?.role === 'admin') redirect('/admin/dashboard')
-  if (profile?.role === 'psychologist') redirect('/psicologo/dashboard')
+  if (profile?.role === 'professional') redirect('/psicologo/dashboard')
 
   redirect('/login')
 }

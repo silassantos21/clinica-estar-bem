@@ -91,14 +91,42 @@ Nunca inicializar estado de layout (ex: sidebar aberta/fechada) com valor do `lo
 
 ---
 
-## CSS — Overflow
+## CSS — Overflow e tooltips
 
 `overflow-x: visible` e `overflow-y: auto` no **mesmo elemento** é inválido pelo spec CSS. O browser promove `visible` para `auto` silenciosamente, gerando barra de scroll horizontal inesperada em qualquer conteúdo absoluto que ultrapasse o container (ex: tooltips, dropdowns).
 
 **Regra:**
-- Container com filhos absolutos → `overflow-hidden`
-- Scroll vertical → elemento interno separado com `overflow-y-auto`
+- Container com filhos absolutos (tooltips, dropdowns) → **NÃO usar `overflow-hidden`** — ele clipa tudo que sair da bounding box, independente de `z-index`
+- Scroll vertical → elemento interno separado com `overflow-y-auto`, nunca no mesmo wrapper dos absolutos
 - Nunca misturar `visible` com `auto/scroll/hidden` no mesmo eixo
+
+### Tooltips em tabelas
+
+`overflow-hidden` no container da tabela clipa tooltips posicionados com `position: absolute`. `z-index` não resolve — ele não tem efeito sobre o clipping de overflow.
+
+**Solução aplicada em `/admin/salas`:**
+```tsx
+// ❌ ERRADO — clipa tooltips
+<div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+// ✅ CORRETO — remove overflow-hidden; arredondamento vai pros th
+<div className="bg-white rounded-xl border border-gray-200">
+  <table>
+    <thead>
+      <tr>
+        <th className="rounded-tl-xl ...">...</th>
+        <th className="rounded-tr-xl ...">...</th>
+```
+
+Para o tooltip em si, usar Tailwind `group/tip` (named group) para evitar conflito com outros grupos:
+```tsx
+<div className="relative group/tip">
+  <button>...</button>
+  <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 ... opacity-0 group-hover/tip:opacity-100 transition-opacity">
+    Tooltip text
+  </span>
+</div>
+```
 
 ---
 
@@ -150,43 +178,29 @@ Três guards disponíveis em `api/src/middlewares/guards.ts`:
 
 | Guard | Quando usar |
 |---|---|
-| `requireAdmin` | Rota exclusiva de admin. Psicólogo recebe 403. |
-| `requirePsychologist` | Rota exclusiva de psicólogo. Admin recebe 403. |
+| `requireAdmin` | Rota exclusiva de admin. Profissional recebe 403. |
+| `requireProfessional` | Rota exclusiva de profissional. Admin recebe 403. |
 | `requireAuth` | Qualquer usuário autenticado; lógica de role **dentro** da rota. |
+
+> Nota: o guard era `requirePsychologist` na v0. Renomeado para `requireProfessional` na Sprint R1.
 
 ### Regra: rotas mistas usam `requireAuth` com lógica interna
 
-Se uma rota precisa de comportamentos diferentes por role (admin vê tudo, psicólogo vê só o próprio), usar `requireAuth` como `preHandler` e decidir dentro da função:
+Se uma rota precisa de comportamentos diferentes por role (admin vê tudo, profissional vê só o próprio), usar `requireAuth` como `preHandler` e decidir dentro da função:
 
 ```typescript
 // ✅ CORRETO
 fastify.get('/reservations', { preHandler: requireAuth }, async (request, reply) => {
-  if (authUser.role === 'psychologist') {
-    query = query.eq('psychologist_id', authUser.psychologistId)
+  if (authUser.role === 'professional') {
+    query = query.eq('professional_id', authUser.professionalId)
   }
   // admin não filtra — vê tudo
 })
 ```
 
-### Erro que já aconteceu: `requireAdmin` numa rota que psicólogo precisa acessar
-
-**Rota afetada:** `GET /psychologists/:id/rooms`
-
-**Sintoma:** 403 "Acesso restrito ao administrador" ao entrar no wizard de nova reserva como psicólogo.
-
-**Causa:** A rota estava com `requireAdmin`, mas o wizard chama `GET /psychologists/:psychologistId/rooms` para carregar as salas com tarifa efetiva do psicólogo.
-
-**Solução aplicada:** Trocar para `requireAuth` com verificação de propriedade:
-```typescript
-// Psicólogo acessa apenas o próprio ID; admin acessa qualquer
-if (authUser.role !== 'admin' && authUser.psychologistId !== id) {
-  return reply.status(403).send({ error: 'Sem permissão para acessar este recurso' })
-}
-```
-
 ### Antes de adicionar `requireAdmin` em qualquer rota nova
 
-Verificar: alguma tela de psicólogo vai chamar esse endpoint? Se sim, usar `requireAuth` com verificação interna.
+Verificar: alguma tela de profissional vai chamar esse endpoint? Se sim, usar `requireAuth` com verificação interna.
 
 ---
 
@@ -228,67 +242,93 @@ Isso instrui o React a ignorar diferenças de atributos nesse elemento durante h
 
 ---
 
-## Mercado Pago — Sandbox e testes
+## Redirect loop pós-migration (tabela `users` zerada)
 
-### Cartões de teste vencem
-Os cartões de teste documentados pelo MP (ex: vencimento `11/25`) ficam vencidos com o tempo. No sandbox, qualquer data futura funciona — usar `11/30` ou `12/28`.
+**Sintoma:** Login autentica com sucesso, mas entra em loop `GET / 307` no terminal da API.
 
-### ERR_TOO_MANY_REDIRECTS no sandbox
-O `sandbox.mercadopago.com.br` entra em loop de redirect quando há cookies conflitantes no browser. Solução: abrir em aba anônima nova e limpar cookies do domínio `sandbox.mercadopago.com.br` antes de acessar.
+**Causa:** A migration cria a tabela `users` do zero (via `DROP TABLE IF EXISTS`). O Supabase Auth (`auth.users`) não é apagado — a sessão do usuário permanece válida. Mas a tabela pública `users` fica vazia, então o middleware não encontra `role` → `redirect('/login')` → o middleware do Next.js detecta sessão ativa em `/login` → `redirect('/')` → loop.
 
-### "Uma das partes é de teste"
-Erro ao tentar pagar no checkout sandbox com conta real do MP. O sandbox exige que **vendedor** (token) e **comprador** (quem paga) sejam ambos contas de teste. Criar conta de comprador teste no painel MP → Contas de teste.
+**Solução:** Após rodar qualquer migration que recriar a tabela `users`, inserir o admin manualmente no Supabase SQL Editor:
+```sql
+INSERT INTO users (id, name, email, role)
+VALUES ('<uuid-do-auth.users>', 'Admin', '<email>', 'admin');
+```
 
-### `auto_return` rejeita back_urls com localhost
-O campo `auto_return: 'approved'` exige `back_urls.success` com URL pública. Em dev o `FRONTEND_URL=http://localhost:3000` é rejeitado pelo MP. **Solução:** removido `auto_return` e `back_urls` da preference; adicionar apenas em produção.
-
-### Endpoint de teste para simular pagamento aprovado
-Em dev, usar `POST /reservations/:id/confirm-test` para confirmar reserva sem passar pelo checkout. Disponível apenas em `NODE_ENV=development`. Simula o que o webhook faria ao receber pagamento aprovado. O botão `[dev] confirmar` aparece na lista de reservas do psicólogo em dev.
-
-### ngrok muda URL a cada reinício (plano free)
-Sempre que reiniciar o ngrok, atualizar em dois lugares:
-1. `API_PUBLIC_URL` em `api/.env`
-2. URL do webhook no painel do MP (mercadopago.com.br/developers/panel → sua app → Webhooks)
+O `id` é o UUID visível em Authentication → Users no painel do Supabase.
 
 ---
 
-## Fluxo de Ausência (no-show)
+## Timezone — data local vs UTC nos slots de disponibilidade
 
-### Como uma ausência é gerada
+**Sintoma:** Ao usar o wizard de reserva à noite (ex: 22h no Brasil, UTC-3), todos os horários aparecem com linha-through como "passados", mesmo em datas futuras.
 
-O sistema **não exige ação manual** do admin para registrar uma ausência. O fluxo é:
+**Causa:** `new Date().toISOString().split('T')[0]` retorna a data em UTC. No Brasil UTC-3, às 22h local o UTC já está no dia seguinte. Se `date` (estado) for inicializado com a data UTC e `todayStr` for calculado com a data local, eles divergem. Quando o usuário volta à data atual local, `date === todayStr` é `true` e `currentHour = 22` desabilita todos os slots das 7h às 21h.
 
-1. Reserva fica `confirmed` (pagamento confirmado)
-2. Horário da sessão passa sem o admin marcar como concluída
-3. O **pg_cron** (Supabase, a cada 15 min) detecta `confirmed` com `end_at < NOW()`
-4. Automaticamente: status → `no_show`, pagamento → `retained`, repasse criado com `penalty_split_rate`
+**Solução:**
+```typescript
+// Helper que sempre retorna YYYY-MM-DD no fuso local
+const localToday = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
-### O admin tem duas ações possíveis ao final de cada sessão
-
-| Ação | Como fazer | Resultado |
-|---|---|---|
-| Sessão aconteceu normalmente | Modal da reserva → "Confirmar sessão concluída" | Status `completed`, repasse pelo valor integral |
-| Paciente não compareceu | Não fazer nada | Cron marca como `Ausência` automático, pagamento retido, repasse pelo split |
-
-### Testar sem esperar o cron
-
-Rodar o SQL manualmente no Supabase SQL Editor (mesmo lógica do cron):
-```sql
--- Verificar o que seria processado
-SELECT r.id, r.status, r.end_at FROM reservations r
-WHERE r.status = 'confirmed' AND r.end_at < NOW();
+// Usar em todos os lugares onde a "data de hoje" é necessária
+const [date, setDate] = useState<string>(localToday)  // ← não usar toISOString()
+const todayStr = localToday()
 ```
 
-Ou chamar o endpoint manual (requer `CRON_SECRET` no header):
-```bash
-curl -X POST http://localhost:3001/cron/no-show \
-  -H "Authorization: Bearer <CRON_SECRET>"
+**Regra:** nunca usar `new Date().toISOString()` para obter a data local do usuário. `toISOString()` sempre retorna UTC.
+
+---
+
+## html2pdf.js — Geração de PDF no browser
+
+### PDF em branco ao passar elemento off-screen
+
+**Sintoma:** `html2pdf().from(container).save()` gera PDF em branco.
+
+**Causa:** O html2canvas não consegue renderizar elementos fora do viewport (`position: absolute; left: -9999px`).
+
+**Solução:** Passar a string HTML diretamente ao `.from()` — o html2pdf cria e posiciona o elemento internamente no viewport:
+```ts
+// ❌ ERRADO — off-screen não renderiza
+const container = document.createElement('div')
+container.style.cssText = 'position:absolute;left:-9999px'
+container.innerHTML = html
+document.body.appendChild(container)
+await html2pdf().from(container).save()
+
+// ✅ CORRETO — html2pdf gerencia o elemento no viewport
+await html2pdf().set({ ... }).from(html).save()
 ```
 
-### Nomenclatura
+### SVG inline não renderiza com html2canvas
 
-- Valor no banco/API: `no_show` (imutável — base de dados e integrações dependem disso)
-- Exibição no frontend: **"Ausência"** (alterado em 2026-06-08; antes era "No-show")
+**Sintoma:** `<svg>` com paths complexos aparece em branco no PDF gerado.
+
+**Causa:** html2canvas tem suporte limitado a SVG inline — paths e elementos complexos não são renderizados.
+
+**Solução:** Converter SVG para PNG via canvas antes de embutir como `<img>`:
+```ts
+const svgText = await fetch('/logo-icon.svg').then(r => r.text())
+const pngDataUrl = await new Promise<string>((resolve) => {
+  const blob = new Blob([svgText], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 176; canvas.height = 176
+    canvas.getContext('2d')!.drawImage(img, 0, 0, 176, 176)
+    URL.revokeObjectURL(url)
+    resolve(canvas.toDataURL('image/png'))
+  }
+  img.onerror = () => { URL.revokeObjectURL(url); resolve('') }
+  img.src = url
+})
+// No HTML: <img src="${pngDataUrl}" width="88" height="88" />
+```
+
+`<img src="data:image/png;base64,...">` é renderizado corretamente pelo html2canvas.
 
 ---
 
@@ -323,3 +363,43 @@ export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$|api).*)'],
 }
 ```
+
+---
+
+## Tailwind CSS v3 — Dark Mode
+
+### Comportamento padrão: media query, não desabilitado
+
+**Sintoma:** Cores escuras (`bg-gray-900`, texto claro) aparecem na interface mesmo após remover `darkMode: 'class'` do config, quando o sistema operacional do usuário está em dark mode.
+
+**Causa:** Em Tailwind v3, **sem `darkMode` no config, o default é `'media'`** (usa `@media (prefers-color-scheme: dark)`). Remover `darkMode: 'class'` não desativa o dark mode — apenas muda a estratégia de class para media query. Todos os `dark:*` continuam gerando CSS e disparando conforme o SO do usuário.
+
+**Solução correta para desativar dark mode:**
+```typescript
+// tailwind.config.ts
+const config: Config = {
+  darkMode: 'class', // mantém estratégia por classe, mas nunca ativa
+  // ...
+}
+```
+
+Com `darkMode: 'class'`, os `dark:` só disparam quando alguém adicionar a classe `.dark` ao `<html>`. Se o ThemeToggle foi removido e nenhum script adiciona `.dark`, o dark mode nunca ativa — independente do SO do usuário.
+
+> **Não existe `darkMode: false` no Tailwind v3.** A única forma de garantir que dark mode nunca dispara é usar `'class'` e nunca adicionar a classe.
+
+### Classes `dark:` restantes no código são código morto inofensivo
+
+Com `darkMode: 'class'` e sem toggle, as classes `dark:bg-gray-900`, `dark:text-gray-100` etc. existentes nos componentes geram CSS mas nunca são aplicadas. Podem ser limpas gradualmente ou deixadas — não causam problema visual.
+
+---
+
+## CSS — SVG com fundo branco sobre fundo branco
+
+**Problema:** Logos em SVG com fundo branco embutido ficam com retângulo branco visível quando o background da página também é branco/claro.
+
+**Solução:** `mix-blend-multiply` faz o branco do SVG se fundir com o fundo branco da página, tornando-o invisível:
+```tsx
+<img src="/logo.svg" alt="Logo" className="h-14 w-auto mix-blend-multiply" />
+```
+
+Funciona apenas em backgrounds claros (branco, cinza claro). Em backgrounds escuros, `mix-blend-multiply` com branco resultaria em preto — mas como o sistema não tem dark mode, não é um problema.

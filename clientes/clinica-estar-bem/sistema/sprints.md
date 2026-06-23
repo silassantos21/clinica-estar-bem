@@ -1,323 +1,246 @@
-# Sprints — Sistema de Gestão Clínica Estar Bem
+# Sprints — Sistema de Agendamento Núcleo Estar Bem
 
 > Referência de spec: `spec.md`
-> Total: 7 semanas (~Sprint 0 em dias, Sprints 1–6 em semanas)
+> Versão: v1 (agendamento sem pagamento)
+> v2 (pagamentos, repasses, no-show) planejada para fase futura
 
 ---
 
-## Sprint 0 — Setup e Infraestrutura ✅
-**Duração:** 3–4 dias
-**Concluído em:** 2026-06-02
+## Histórico — v0 (concluído em 2026-06-08)
 
-### Tarefas
-
-**Repositório**
-- [x] Estrutura de pastas criada: `api/`, `web/`, `supabase/`
-- [x] `.env.example` configurado em `api/` e `web/` com todas as variáveis
-- [x] `.gitignore` cobrindo `.env`, `node_modules`, `.next/`, uploads
-
-**Banco (Supabase)**
-- [x] Migration SQL completa: `supabase/migrations/20260602000001_initial_schema.sql`
-  — tabelas: `settings`, `users`, `psychologists`, `rooms`, `psychologist_rooms`, `patients`, `reservations`, `payments`, `cancellations`, `repasses`
-- [x] Seed inicial incluído na migration: `cancellation_tolerance_hours = 9`
-- [x] RLS habilitado em todas as tabelas; policy de leitura própria em `users`
-- [ ] **PENDENTE (manual):** criar projeto no Supabase e rodar a migration no SQL Editor
-
-**API (Fastify)**
-- [x] Scaffold: `src/plugins/`, `src/routes/`, `src/services/`, `src/middlewares/`, `src/types/`
-- [x] Plugin `supabase.ts` — client com `service_role`, decorado em `fastify.supabase`
-- [x] Plugin `auth.ts` — valida Bearer JWT via `supabase.auth.getUser()`, popula `request.authUser`
-- [x] Guards `requireAdmin` / `requirePsychologist` / `requireAuth`
-- [x] Rota `GET /health`
-- [x] `app.ts` + `server.ts` com CORS e Pino logger
-- [ ] **PENDENTE (manual):** preencher `api/.env` e rodar `npm install && npm run dev`
-
-**Frontend (Next.js)**
-- [x] Scaffold: App Router, TypeScript, Tailwind CSS
-- [x] `middleware.ts` — proteção global de rotas, redireciona não-autenticados pro `/login`
-- [x] `lib/supabase/client.ts` e `server.ts` — clientes browser e server component
-- [x] `lib/api.ts` — cliente HTTP com injeção automática de Bearer token
-- [x] Tela de login (`/login`) com email/senha via Supabase Auth
-- [x] `page.tsx` raiz — redireciona por role (admin → `/admin/dashboard`, psicólogo → `/psicologo/dashboard`)
-- [x] Layout admin com sidebar (Visão geral, Salas, Psicólogos, Reservas, Repasses, Relatórios, Configurações)
-- [x] Layout psicólogo com sidebar (Minha agenda, Pacientes, Reservas, Meus repasses)
-- [x] Dashboards vazios (placeholders para Sprints 2 e 5)
-- [ ] **PENDENTE (manual):** preencher `web/.env.local` e rodar `npm install && npm run dev`
-
-**Infra**
-- [ ] **PENDENTE (manual):** deploy API no Railway
-- [ ] **PENDENTE (manual):** deploy frontend na Vercel
-- [ ] **PENDENTE (manual):** variáveis de ambiente configuradas nos dois serviços
-
-**Critério de aceite:** `GET /health` retorna 200 no staging. Login funciona e redireciona por role.
+Sprints 0–5 foram desenvolvidas com escopo de coworking com pagamento antecipado (Mercado Pago, repasses, penalidades). Após feedback do cliente, o escopo foi reformulado para foco em agendamento simples. O código das Sprints 0–5 serve de base estrutural — módulos de pagamento e repasse serão removidos na Sprint R1.
 
 ---
 
-## Sprint 1 — Auth, Salas e Psicólogos ✅
-**Duração:** 1 semana
-**Iniciado em:** 2026-06-03
-**Concluído em:** 2026-06-03
+## Sprint R1 — Limpeza e base nova
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 2–3 dias
 
-### Tarefas
+### Banco (Supabase)
+- [x] Nova migration descartando schema anterior (dados de teste — ok apagar)
+- [x] Tabelas mantidas (simplificadas): `settings`, `users`, `professionals`, `rooms`, `reservations`, `cancellations`
+- [x] Nova tabela: `room_blocks` (`id`, `room_id` FK, `date` DATE, `hour` INT, `blocked_by` FK → users, `reason` TEXT, `created_at`)
+- [x] Tabelas removidas: `payments`, `repasses`, `patients`, `psychologist_rooms`
+- [x] `rooms`: remover `hourly_rate` e `floor`; adicionar `number` INT (1–5)
+- [x] `reservations`: remover `patient_id` e `total_amount`; status = `confirmed | cancelled`
+- [x] `cancellations`: remover campos financeiros (`penalty_applied`, `clinic_amount`, `psychologist_amount`)
+- [x] `professionals`: remover `crp` e `penalty_split_rate`
+- [x] Seed: 5 salas (Sala 1 a Sala 5), `cancellation_tolerance_hours = 5`
 
-**Correção de estrutura (roteamento Next.js)**
-- [x] Mover dashboards para caminhos corretos (`(admin)/admin/` e `(psychologist)/psicologo/`)
-  — route groups `()` não geram segmento de URL; arquivos em caminhos duplos conflitavam em `/dashboard`
+### API
+- [x] Remover `api/src/routes/payments.ts` e `api/src/routes/repasses.ts`
+- [x] Renomear `psychologists.ts` → `professionals.ts` e todas as rotas `/psychologists` → `/professionals`
+- [x] Atualizar guards: `requirePsychologist` → `requireProfessional`
+- [x] Remover toda referência a `patient_id`, `total_amount`, `hourly_rate`, `penalty_split_rate` nas rotas de reservas
+- [x] Simplificar `POST /reservations` — sem cálculo de tarifa, sem criação de payment
+- [x] `GET /rooms/availability` — incluir `room_blocks` na verificação de disponibilidade
+- [x] Adicionar `PUT /auth/change-password` — profissional altera a própria senha
 
-**API**
-- [x] `POST /auth/login` + `POST /auth/logout`
-- [x] `GET/POST/PUT/DELETE /rooms` (admin only)
-- [x] `GET/POST/PUT /psychologists` (admin only)
-- [x] `GET/PUT /psychologists/:id/rooms/:room_id` — tarifas customizadas (`psychologist_rooms`)
-- [x] `GET/PUT /settings/:key` (admin only)
+### Frontend
+- [x] Renomear "Clínica Estar Bem" → "Núcleo Estar Bem" em todo o sistema (títulos, textos, metadata)
+- [x] Renomear "psicólogo/psicóloga" → "profissional" em toda a UI
+- [x] Sidebar admin: remover "Repasses" e "Relatórios" (serão recriados na R4)
+- [x] Sidebar profissional: remover "Pacientes" e "Meus repasses"
+- [x] Wizard de reserva: reduzir de 4 para 3 etapas (sala + data → horário → confirmar)
+- [x] Remover etapa de paciente e todos os componentes de paciente
+- [x] Remover telas: `/admin/repasses`, `/admin/relatorios`, `/psicologo/repasses`
+- [x] Tela de perfil do profissional com opção "Alterar senha"
+- [x] Tela de perfil do admin com opção "Alterar senha"
 
-**Frontend**
-- [x] Tela de gestão de salas (listar, criar, editar, ativar/desativar)
-- [x] Tela de gestão de psicólogos (listar, criar, editar, `penalty_split_rate`)
-- [x] Modal de tarifas customizadas por sala (por psicólogo)
-- [x] Tela de configurações (`cancellation_tolerance_hours`)
-- [x] Dashboard do psicólogo (painel vazio com boas-vindas)
-- [x] Dashboard do admin (placeholder — dados no Sprint 5)
-
-**Polimento UI (pós-critério)**
-- [x] Logo no login aumentada (`h-48`), sidebar (`h-14`)
-- [x] Botão "Sair" na parte inferior do sidebar (admin e psicólogo) via `LogoutButton` client component
-- [x] Favicon configurado via metadata do Next.js
-
-**Critério de aceite:** Admin cria sala com tarifa. Cria psicólogo com split diferente e tarifa customizada. Psicólogo loga e vê o painel.
-
----
-
-## Sprint 2 — Pacientes e Reservas ✅
-**Duração:** 1 semana
-**Concluído em:** 2026-06-06
-
-### Tarefas
-
-**API**
-- [x] `GET/POST/PUT/DELETE /patients` (psicólogo — só os próprios)
-- [x] `GET /rooms/availability?date=&room_id=` — retorna horários livres do dia (blocos de 1h, 07h–21h)
-- [x] `POST /reservations` — cria reserva com cálculo de tarifa (`get_rate`)
-- [x] `GET /reservations` — admin vê todas; psicólogo vê só as próprias (filtros: data, status, sala, psicólogo)
-- [x] `GET /reservations/:id`
-- [x] Validação de conflito de horário (overlap check na mesma sala, exclui canceladas)
-
-**Frontend**
-- [x] Tela de pacientes (listar, criar, editar, excluir com confirmação)
-- [x] Wizard de nova reserva 4 etapas: sala + data → horário (grid) → paciente → confirmar
-- [x] Grid de disponibilidade com horários ocupados desabilitados
-- [x] Lista de reservas do psicólogo com filtros de data e status + modal de detalhe
-- [x] Lista de reservas do admin com filtros de data, status, sala e psicólogo + modal de detalhe
-
-**Critério de aceite:** Psicólogo cria reserva. Tentar criar no mesmo horário/sala retorna erro. Admin vê todas as reservas.
-
-**Polimento e correções pós-entrega**
-- [x] Bug: `GET /psychologists/:id/rooms` estava com `requireAdmin` — psicólogo recebia 403 ao abrir o wizard. Corrigido para `requireAuth` com verificação de propriedade (`authUser.psychologistId === params.id`)
-- [x] Bug: campo `active` ausente do `select` na mesma rota — `data.filter((r) => r.active)` no frontend descartava todas as salas. Adicionado `active` ao select
-- [x] Bug: cálculo de `end_at` usava `substring(0, 14)` que incluía os dois pontos dos minutos, gerando `"T08:09:00:00"` inválido. Corrigido para parsear hora direto da string com `substring(11, 13)`
-- [x] Bug: `psychologistId` retornava `undefined` por join PostgREST reverso (`psychologists(id)` na query de `users`). Corrigido para query separada em `psychologists WHERE user_id = ?`
-- [x] Horários passados bloqueados no grid quando data selecionada é hoje
-- [x] Calendários e botões do psicólogo migrados para `brand-600` (#C01C63) — consistente com sidebar
-- [x] Grammarly warning (`data-new-gr-c-s-check-loaded`) resolvido com `suppressHydrationWarning` no `<html>` e `<body>`
+**Critério de aceite:** Admin cria profissional com senha temporária. Profissional loga, faz reserva de Sala 2 às 10h, vê a reserva na lista. Admin vê a reserva no painel. ✅ Testado localmente.
 
 ---
 
-## Sprint 3 — Pagamentos (Mercado Pago) ✅
-**Duração:** 1 semana
-**Concluído em:** 2026-06-06
+## Sprint R2 — Bloqueio de vagas pelo admin
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 1–2 dias
 
-### Tarefas
+### API ✅ implementada em R1
+- [x] `POST /rooms/:id/blocks` (admin) — bloqueia `{ date, hour, reason }`
+- [x] `DELETE /rooms/:id/blocks/:block_id` (admin) — desbloqueia
+- [x] `GET /rooms/:id/blocks?date=` — lista bloqueios do dia
+- [x] `GET /rooms/availability` já considera `room_blocks` (slot bloqueado = indisponível)
 
-**API** (`api/src/routes/payments.ts`)
-- [x] `POST /reservations/:id/payment` — cria preference no MP, salva `mp_preference_id` e `payment_link_url` em `payments`; se já existe link pendente, retorna o existente
-- [x] `POST /webhooks/mercadopago` — valida assinatura com `WebhookSignatureValidator` do SDK, atualiza `payments.status = paid` e `reservations.status = confirmed`
-- [x] `POST /reservations/:id/refund` (admin) — chama `PaymentRefund` do SDK, atualiza status para `refunded`
-- [x] `GET /reservations` e `GET /reservations/:id` — incluem dados de `payments(id, status, payment_link_url)` no select
+### Frontend ✅
+- [x] Nova tela `/admin/bloqueios` — grid Hora × Sala (7–21h × Salas 1–5)
+- [x] Clique em slot livre → modal "Bloquear horário" (sala, data, hora, motivo)
+- [x] Clique em slot bloqueado → modal "Desbloquear" com motivo exibido
+- [x] Horários passados do dia atual: desabilitados (cinza claro para livres, laranja apagado para bloqueados)
+- [x] "Bloqueios" adicionado no sidebar admin
+- [x] `api.ts` corrigido para tratar resposta 204 sem body (DELETE)
 
-**Integrações**
-- [x] SDK `mercadopago` v3 instalado na API
-- [x] `MP_ACCESS_TOKEN` configurado em `api/.env`
-- [x] `API_PUBLIC_URL` configurado com URL do ngrok em `api/.env`
-- [x] Webhook configurado no painel MP apontando para `API_PUBLIC_URL/webhooks/mercadopago`
-- [x] `MP_WEBHOOK_SECRET` configurado em `api/.env`
-
-**Frontend**
-- [x] Tela de sucesso no wizard após criar reserva — botões "Pagar agora" e "Pagar depois"
-- [x] "Pagar agora" gera o link via `POST /reservations/:id/payment` e abre no MP
-- [x] Botão "Pagar" na lista de reservas pendentes
-- [x] Badge de status de pagamento no modal de detalhe
-- [x] Botão `[dev] confirmar` visível apenas em `NODE_ENV=development` para simular pagamento aprovado sem passar pelo checkout
-
-**Testado em dev (2026-06-08)**
-- Criação de reserva → geração do link → preference criada no MP ✅
-- `POST /reservations/:id/confirm-test` atualiza `payments.status = paid` e `reservations.status = confirmed` ✅
-- UI reflete status corretamente ✅
-- Webhook end-to-end (MP → ngrok → API) não testado — sandbox do MP com problemas de redirect loop e cartões de teste vencidos; código está correto, validar em produção
-
-**Critério de aceite:** Reserva criada → link gerado → pagamento no sandbox → webhook recebido → status vira `confirmed` automaticamente.
-
-**Obs:** ngrok muda de URL a cada reinício (plano free) — sempre atualizar `API_PUBLIC_URL` no `.env` e a URL do webhook no painel do MP.
+**Critério de aceite:** Admin bloqueia Sala 3 das 14h às 15h. Profissional não vê esse horário como disponível no wizard. ✅
 
 ---
 
-## Sprint 4 — Cancelamentos e No-show ✅
-**Duração:** 1 semana
-**Concluído em:** 2026-06-08
+## Sprint R3 — Cancelamento simplificado
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 1 dia
 
-### Tarefas
+### API ✅ (implementada em R1)
+- [x] `POST /reservations/:id/cancel` — profissional: verifica janela de 5h; retorna 403 com `{ error, hours_before_start, tolerance_hours }` se dentro da janela
+- [x] Sem lógica de penalidade, reembolso ou split
+- [x] Admin cancela sem restrição de janela
 
-**API**
-- [x] `POST /reservations/:id/cancel` — recebe `reason` (patient_request | psychologist_decision | clinic_decision)
-  - Lê `settings.cancellation_tolerance_hours`
-  - Aplica lógica de penalidade ou reembolso
-  - Cria registro em `cancellations`
-  - Cria `repasses` se houver split a pagar
-  - Chama reembolso via MP se aplicável
-- [x] `GET /reservations/:id/cancel-preview?reason=...` — retorna breakdown financeiro antes de confirmar
-- [x] Permissões de cancelamento por role e reason (conforme matriz)
-- [x] `POST /cron/no-show` — endpoint manual protegido por `CRON_SECRET` (para testes e fallback)
+### Frontend ✅
+- [x] Botão "Cancelar reserva" desabilitado (cinza, cursor-not-allowed) quando `hoursUntil < 5h`
+- [x] Mensagem abaixo do botão: "Cancelamento encerrado — faltam menos de 5h para o horário"
+- [x] Botão escondido quando reserva já passou (`hoursUntil <= 0`)
+- [x] Admin: botão sempre habilitado para qualquer reserva confirmada (sem restrição)
 
-**Cron (Supabase pg_cron)**
-- [x] Job a cada 15 min via `pg_cron` no próprio Supabase (migration: `20260608000001_no_show_cron.sql`)
-  - `payments.status = retained`
-  - `reservations.status = no_show`
-  - Cria `cancellations` com `reason = no_show`
-  - Cria `repasses` com split do psicólogo
-
-**Frontend**
-- [x] Botão "Cancelar reserva" no modal de detalhe (psicólogo e admin)
-- [x] Modal de cancelamento: motivos corretos por role (psicólogo: patient_request | psychologist_decision; admin: patient_request | clinic_decision)
-- [x] Breakdown da penalidade antes de confirmar (se < tolerância)
-- [x] Exibição de reembolso integral se elegível
-- [x] Loading skeleton nas etapas Sala e Paciente do wizard de nova reserva
-
-**Critério de aceite:** Cancelamento dentro da janela → sem reembolso, split registrado. Cancelamento fora → reembolso processado. Reserva expirada sem ação → no-show no cron seguinte.
-
-**Notas técnicas**
-- Cron roda no Supabase (pg_cron), não no Railway — Railway não está em uso ainda
-- `CRON_SECRET` adicionado ao `api/.env.example` — necessário adicionar no `api/.env` local
-- Preview financeiro busca `penalty_split_rate` do psicólogo e `cancellation_tolerance_hours` das settings via API
+**Critério de aceite:** Reserva para daqui a 3h — botão desabilitado para o profissional, habilitado para o admin. Reserva para daqui a 6h — cancelamento funciona para ambos. ✅
 
 ---
 
-## Sprint 5 — Repasses e Relatórios ✅
-**Duração:** 1 semana
-**Concluído em:** 2026-06-08
+## Sprint R4 — Relatórios (semanal e mensal)
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 2 dias
 
-### Tarefas
+### API ✅
+- [x] `GET /reports/weekly?start=YYYY-MM-DD` — agrupamento por profissional, 7 dias a partir de `start`
+- [x] `GET /reports/monthly?month=M&year=YYYY` — mesma estrutura, escopo mensal
+- [x] Resposta: `{ start, end, rows: [{ name, reservations_count, cancellations_count, rooms_used[] }] }`
+- [x] Contagem baseada em `reservations.status` (confirmed/cancelled) com `start_at` no período
 
-**API** (`api/src/routes/repasses.ts`)
-- [x] `POST /reservations/:id/complete` (admin) — marca sessão como `completed`, cria `repasse` com valor integral do psicólogo (idempotente)
-- [x] `GET /repasses` — admin vê todos; psicólogo vê só os próprios (filtros: status, psicólogo)
-- [x] `PUT /repasses/:id/pay` (admin) — marca repasse como `paid`, registra `paid_by` e `notes`
-- [x] `GET /reports/financial?month=&year=` — receita bruta, retido, reembolsado, repasses pagos/pendentes
-- [x] `GET /reports/rooms?start=&end=` — horas reservadas vs disponíveis por sala, taxa de ocupação
-- [x] `GET /reports/psychologists?start=&end=` — reservas, concluídas, cancelamentos, ausências, repasses por psicólogo
+### Frontend ✅
+- [x] `/admin/relatorios` — toggle "Semanal / Mensal" + navegação de período (setas prev/next)
+- [x] Tabela: Profissional | Agendamentos | Cancelamentos | Salas utilizadas
+- [x] Rodapé com totais gerais
+- [x] Botão "Imprimir" com `window.print()` — controles e filtros ocultos com `print:hidden`
+- [x] "Relatórios" adicionado no sidebar admin (após Reservas)
+- [x] Cabeçalho de impressão com `logo-icon.svg` (h-24), linha magenta, título e período à direita
+- [x] Botão "Baixar PDF" via `html2pdf.js` — SVG convertido para PNG via canvas antes de embutir no HTML
+- [x] Skeleton de loading (`admin/loading.tsx`) entre transições de página
 
-**Frontend**
-- [x] `/admin/repasses` — lista com filtros (status, psicólogo), total pendente em destaque, modal "Marcar como pago" com observação
-- [x] `/admin/relatorios` — seletor mês/ano, cards financeiros, barra de ocupação por sala, tabela por psicólogo
-- [x] `/psicologo/repasses` — lista com filtro de status e paciente, cards "A receber / Já recebido"
-- [x] `/admin/dashboard` — cards com dados reais (reservas hoje, receita do mês, repasses pendentes, ocupação)
-- [x] `/admin/reservas` — botão "Confirmar sessão concluída" no modal (aparece quando `confirmed` + `end_at` no passado)
-
-**Critério de aceite:** Admin confirma sessão → repasse aparece como pendente. Admin marca como pago. Relatório mensal bate com os registros.
-
-**Notas técnicas**
-- Migration `20260608000002_repasses_created_at.sql` — adiciona `created_at` na tabela `repasses` (rodar no Supabase SQL Editor)
-- Ausência é gerada automaticamente pelo pg_cron (a cada 15 min) — admin não precisa fazer nada; se a sessão passar sem ser confirmada, vira ausência com retenção de pagamento e split de penalidade
-- Botões primários do sistema (admin e psicólogo) padronizados em `brand-600` (#C01C63)
-- Label "no-show" substituído por "Ausência" em todo o frontend (valor interno `no_show` no banco/API permanece)
+**Critério de aceite:** Relatório da semana mostra o que cada profissional agendou e o que cancelou. Relatório mensal consolida o mês inteiro. PDF baixado com cabeçalho profissional. ✅
 
 ---
 
-## Sprint 6 — Notificações
-**Duração:** 1 semana
-**Entrega:** Email e WhatsApp disparados em todos os eventos mapeados
+## Sprint R5 — Mobile-first
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 2–3 dias
 
-### Tarefas
+**Contexto:** sistema será usado via celular desde o início (notebook chega em agosto).
 
-**Infraestrutura**
-- [ ] Configurar Nodemailer com SMTP (Gmail ou Resend.com)
-- [ ] Configurar Z-API (WhatsApp) ou Twilio — número de negócio conectado
-- [ ] Serviço de notificação centralizado: `NotificationService.send(type, recipients, data)`
+- [x] Sidebar colapsável (hamburguer) em telas menores que 768px
+- [x] Wizard de reserva funcional em tela de 390px (iPhone 14 Pro)
+- [x] Grid de disponibilidade com scroll adequado no mobile
+- [x] Cards e tabelas sem scroll horizontal em mobile — convertidos para cards expansíveis
+- [x] Botões com área de toque mínima de 44px
+- [x] Modal de detalhes da reserva funcional no mobile — substituído por inline expand
+- [x] Logo-icon no header mobile (menor, sem fundo branco)
+- [x] Select customizado (substitui `<select>` nativo — não estilizável no mobile)
+- [x] Cards expansíveis: reservas (data+hora no header; sala/status/profissional dentro), salas, profissionais, relatórios
 
-**Templates**
-- [ ] Email: confirmação de reserva (link de pagamento)
-- [ ] Email + WhatsApp: pagamento confirmado (psicólogo e paciente)
-- [ ] WhatsApp: lembrete 24h antes (paciente)
-- [ ] Email + WhatsApp: cancelamento (psicólogo e paciente)
-- [ ] Email: no-show detectado (psicólogo)
-- [ ] Email: repasse registrado (psicólogo)
-
-**Cron adicional**
-- [ ] Job diário: busca reservas com `start_at` em 24h e `status = confirmed` → dispara lembrete WhatsApp
-
-**Wiring**
-- [ ] Conectar cada evento da API ao `NotificationService`
-
-**Critério de aceite:** Criar reserva → email chega. Pagar → WhatsApp chega pro paciente. Cancelar → ambos notificados. Lembrete 24h antes funciona.
+**Critério de aceite:** Profissional consegue fazer reserva completa no celular sem zoom nem scroll horizontal. ✅
 
 ---
 
-## Sprint 7 — Deploy, Validação e Entrega
-**Duração:** 1 semana
-**Entrega:** Sistema em produção, testado com o cliente, pronto pra uso real
+## Sprint R6 — Notificações WhatsApp
+**Status:** CONCLUÍDA (2026-06-22)
+**Estimativa:** 1 semana
 
-### Tarefas
+**Canal único:** WhatsApp via Z-API (cliente prefere WhatsApp; sem email na v1)
 
-**Hardening**
+- [x] `api/src/services/notifications.ts` — `sendWhatsApp(phone, message)` fire-and-forget; nunca falha a request principal
+- [x] `msgConfirmacao`, `msgCancelamento`, `msgLembrete` — templates de mensagem com parse manual de data (evita timezone)
+- [x] Gatilho: `POST /reservations` → WhatsApp de confirmação ao profissional
+- [x] Gatilho: `POST /reservations/:id/cancel` → WhatsApp de cancelamento ao profissional (admin e profissional)
+- [x] `api/src/cron/reminders.ts` — cron diário às 8h (Brasília) via `node-cron`; busca reservas do dia seguinte e envia lembrete
+- [x] Cron registrado em `server.ts` após app.listen(), passando `app.supabase`
+- [x] Env vars documentadas em `.env.example`: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`
+- [ ] Configurar Z-API no painel (conectar número da clínica) — pendente: feito pelo cliente
+
+**Critério de aceite:** Profissional reserva Sala 2 → recebe WhatsApp de confirmação em até 30 segundos. ✅ (requer Z-API configurada)
+
+---
+
+## Correções e polimento (pós-R6)
+**Status:** CONCLUÍDO (2026-06-22)
+
+Ajustes identificados durante uso real do sistema no celular:
+
+### Dark mode — remoção definitiva
+- [x] `tailwind.config.ts`: adicionado `darkMode: 'class'` — impede que `dark:` dispare via `prefers-color-scheme`. Sem ThemeToggle, dark mode nunca ativa.
+- [x] `AppShell.tsx`: ThemeToggle removido; logos com `mix-blend-multiply` (fundo branco invisível sobre fundo claro)
+- [x] `layout.tsx`: script anti-flash removido; `suppressHydrationWarning` no `<body>` (fix para extensão Grammarly)
+- [x] Páginas `configuracoes` e `perfil`: removidas classes `dark:` — cards sempre brancos
+
+### Correções de cards mobile
+- [x] **Reservas (admin e profissional):** cabeçalho do card mostra apenas data+hora; sala/status/profissional aparecem ao expandir
+- [x] **Salas:** número removido do cabeçalho mobile
+- [x] **Profissionais:** só nome no cabeçalho; email/status/WhatsApp ao expandir
+- [x] **Relatórios:** só nome no cabeçalho; tabs Semanal/Mensal em brand-600; rodapé sem "Total", valores por extenso em linhas separadas
+
+### Bloqueios — UX mobile
+- [x] Substituída tabela Hora × Sala (scroll horizontal impossível no celular) por:
+  - Dois selects: Hora (07:00–21:00) e Sala
+  - Painel de status grande abaixo com código de cores:
+    - Verde / Disponível → botão "Bloquear este horário" (laranja)
+    - Laranja / Bloqueado → motivo destacado + botão "Desbloquear" (vermelho)
+    - Azul / Reservado → aviso informativo, sem ação
+    - Cinza / Passado → aviso informativo, sem ação
+  - Modais de confirmação compartilhados com desktop
+  - Desktop: tabela grid original mantida intacta
+
+---
+
+## Sprint R7 — Deploy e entrega
+**Status:** Pendente
+**Estimativa:** 1 semana
+
+### Hardening
 - [ ] Validação de inputs em todas as rotas (Zod + Fastify schema)
 - [ ] Tratamento global de erros (respostas padronizadas)
-- [ ] Rate limiting nas rotas públicas (webhook, login)
-- [ ] Logs estruturados (Pino, que já vem com Fastify)
+- [ ] Rate limiting nas rotas públicas (login)
 
-**Deploy produção**
-- [ ] Variáveis de ambiente de produção (Railway + Vercel)
+### Deploy produção
+- [ ] Variáveis de ambiente no Railway (API) e Vercel (web)
 - [ ] Supabase: projeto de produção separado do staging
-- [ ] Mercado Pago: credenciais de produção + webhook URL de prod
-- [ ] Z-API/Twilio: número de produção
+- [ ] Z-API: número de produção configurado
 
-**Testes E2E (fluxos críticos)**
-- [ ] Criar reserva → pagar → confirmar
-- [ ] Cancelar dentro da tolerância → penalidade aplicada
-- [ ] Cancelar fora da tolerância → reembolso processado
-- [ ] No-show → retenção automática
+### Entrega
+- [ ] Sessão de walkthrough com a cliente (fluxo admin + profissional)
+- [ ] Admin cadastra todos os profissionais, envia senhas via WhatsApp
+- [ ] Treinamento: fazer reserva, cancelar, ver bloqueios, gerar relatório
 
-**UAT com cliente**
-- [ ] Sessão de walkthrough com o cliente
-- [ ] Ajustes de UX baseados no feedback
-- [ ] Treinamento básico (admin + psicólogo)
-
-**Critério de aceite:** Sistema em produção com dados reais. Cliente consegue operar sem assistência técnica.
+**Critério de aceite:** Sistema no ar, cliente consegue operar sem assistência técnica.
 
 ---
 
 ## Resumo
 
-| Sprint | Foco | Duração |
+| Sprint | Foco | Estimativa |
 |---|---|---|
-| 0 | Setup e infra | 3–4 dias |
-| 1 | Auth, salas, psicólogos | 1 semana |
-| 2 | Pacientes e reservas | 1 semana |
-| 3 | Pagamentos (Mercado Pago) | 1 semana |
-| 4 | Cancelamentos e no-show | 1 semana |
-| 5 | Repasses e relatórios | 1 semana |
-| 6 | Notificações | 1 semana |
-| 7 | Deploy, testes, entrega | 1 semana |
-| **Total** | | **~7 semanas** |
+| R1 | Limpeza, schema novo, renomeação | 2–3 dias |
+| R2 | Bloqueio de vagas (admin) | 2–3 dias |
+| R3 | Cancelamento simplificado | 1 dia |
+| R4 | Relatórios semanal + mensal | 2 dias |
+| R5 | Mobile-first | 2–3 dias |
+| R6 | Notificações WhatsApp | 1 semana |
+| R7 | Deploy + entrega | 1 semana |
+| **Total** | | **~4–5 semanas** |
 
 ---
 
-## Ordem de dependências críticas
+## Dependências
 
 ```
-Sprint 0 (infra)
-  └── Sprint 1 (entidades base)
-        └── Sprint 2 (reservas)
-              └── Sprint 3 (pagamentos)
-                    └── Sprint 4 (cancelamentos)  ←── depende do fluxo de reembolso do MP
-                          └── Sprint 5 (repasses)
-Sprint 6 (notificações) ←── pode começar em paralelo com Sprint 4
-Sprint 7 (entrega) ←── depende de tudo
+R1 (base)
+  └── R2 (bloqueios — depende do availability atualizado)
+  └── R3 (cancelamento — depende do schema novo)
+  └── R4 (relatórios — depende do schema novo)
+        └── R5 (mobile — pode começar em paralelo com R2/R3/R4)
+              └── R6 (notificações — depende da API estável)
+                    └── R7 (deploy — depende de tudo)
 ```
+
+---
+
+## Para v2 (fase futura)
+
+- Pagamentos via Mercado Pago
+- Repasses e splits financeiros
+- Janela de cancelamento ampliada para 10h
+- Cobrança por no-show
+- Reembolso automatizado

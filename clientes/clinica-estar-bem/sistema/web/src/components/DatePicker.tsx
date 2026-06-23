@@ -57,7 +57,6 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // Sincroniza cursor ao abrir se value mudou externamente
   useEffect(() => {
     if (selected) setCursor(new Date(selected.getFullYear(), selected.getMonth(), 1))
   }, [value])
@@ -65,7 +64,6 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
   const prevMonth = () => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
   const nextMonth = () => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
 
-  // Dias do grid: começa no domingo da semana do dia 1
   const firstDay = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0)
   const gridStart = new Date(firstDay)
@@ -102,18 +100,17 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400/30 ${
+        className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400/30 ${
           open
-            ? 'border-brand-400 bg-white'
-            : 'border-gray-200 bg-white hover:border-brand-300'
+            ? 'border-brand-400 dark:border-brand-500'
+            : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
         }`}
       >
-        {/* Calendar icon */}
-        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
             d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
         </svg>
-        <span className={value ? 'text-gray-900' : 'text-gray-400'}>
+        <span className={value ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}>
           {value ? fmtDisplay(value) : placeholder}
         </span>
         {value && (
@@ -122,7 +119,7 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
             tabIndex={0}
             onClick={(e) => { e.stopPropagation(); onChange('') }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onChange('') } }}
-            className="ml-auto text-gray-300 hover:text-gray-500 text-base leading-none cursor-pointer"
+            className="ml-auto text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 text-base leading-none cursor-pointer"
             aria-label="Limpar data"
           >
             ×
@@ -131,25 +128,24 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-72 select-none">
-          {/* Cabeçalho: mês e navegação */}
+        <div className="absolute z-50 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 w-72 select-none">
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
               onClick={prevMonth}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {MONTHS[cursor.getMonth()]} {cursor.getFullYear()}
             </span>
             <button
               type="button"
               onClick={nextMonth}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -157,19 +153,16 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
             </button>
           </div>
 
-          {/* Dias da semana */}
           <div className="grid grid-cols-7 mb-1">
             {WEEKDAYS.map((wd) => (
-              <div key={wd} className="text-center text-xs font-medium text-gray-400 py-1">
+              <div key={wd} className="text-center text-xs font-medium text-gray-400 dark:text-gray-500 py-1">
                 {wd}
               </div>
             ))}
           </div>
 
-          {/* Grid de dias */}
           <div className="grid grid-cols-7 gap-y-0.5">
             {days.map((day, i) => {
-              const iso = toIso(day)
               const isSelected = selected ? sameDay(day, selected) : false
               const isToday = sameDay(day, today)
               const disabled = isDisabled(day)
@@ -187,10 +180,10 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
                     ${isSelected
                       ? 'bg-brand-600 text-white'
                       : disabled
-                      ? 'text-gray-200'
+                      ? 'text-gray-200 dark:text-gray-700'
                       : !currentMonth
-                      ? 'text-gray-300 hover:bg-brand-50'
-                      : 'text-gray-700 hover:bg-brand-50 hover:text-brand-700'
+                      ? 'text-gray-300 dark:text-gray-600 hover:bg-brand-50 dark:hover:bg-brand-900/20'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-700 dark:hover:text-brand-400'
                     }
                   `}
                 >
@@ -205,12 +198,11 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', m
             })}
           </div>
 
-          {/* Botão "Hoje" */}
-          <div className="mt-3 pt-3 border-t border-gray-100 text-center">
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-center">
             <button
               type="button"
               onClick={() => { onChange(toIso(today)); setOpen(false) }}
-              className="text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors"
+              className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 transition-colors"
             >
               Hoje
             </button>

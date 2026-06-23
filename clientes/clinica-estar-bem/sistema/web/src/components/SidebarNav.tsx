@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 
 type NavItem = { href: string; label: string }
 
-export function SidebarNav({ items }: { items: NavItem[] }) {
+export function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   const pathname = usePathname()
 
   return (
@@ -16,10 +16,11 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+            onClick={onNavigate}
+            className={`block px-3 py-2.5 rounded-lg text-sm transition-colors ${
               isActive
-                ? 'bg-brand-50 text-brand-600 font-medium'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
           >
             {item.label}

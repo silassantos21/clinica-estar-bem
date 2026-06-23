@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'psychologist'
+export type UserRole = 'admin' | 'professional'
 
 export interface AuthUser {
   id: string
@@ -6,7 +6,7 @@ export interface AuthUser {
   role: UserRole
   name: string
   active: boolean
-  psychologistId?: string // preenchido quando role = psychologist
+  professionalId?: string // preenchido quando role = professional
 }
 
 // Augmenta o FastifyRequest para incluir o usuário autenticado

@@ -6,9 +6,9 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
-export async function requirePsychologist(request: FastifyRequest, reply: FastifyReply) {
-  if (request.authUser?.role !== 'psychologist') {
-    return reply.status(403).send({ error: 'Acesso restrito ao psicólogo' })
+export async function requireProfessional(request: FastifyRequest, reply: FastifyReply) {
+  if (request.authUser?.role !== 'professional') {
+    return reply.status(403).send({ error: 'Acesso restrito ao profissional' })
   }
 }
 

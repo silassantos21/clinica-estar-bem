@@ -120,6 +120,10 @@ Antes de debugar qualquer problema de build, deploy, env ou Windows: ler `client
 - dist corrompido/sumindo
 - SSR + autenticação no Next.js
 - RLS e diferença de keys no Supabase
+- **Tailwind v3 dark mode:** sem `darkMode: 'class'`, o default é media query (dispara pelo SO). Usar sempre `darkMode: 'class'` para desativar efetivamente.
+- SVG com fundo branco: usar `mix-blend-multiply` ao invés de editar o SVG
+- Hydration warning de extensões (Grammarly): `suppressHydrationWarning` no `<body>`
+- html2pdf.js: SVG não renderiza — converter para PNG via canvas antes
 
 ---
 
