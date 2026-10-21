@@ -203,9 +203,16 @@ Ajustes identificados durante uso real do sistema no celular:
 - [x] `web/vercel.json` — fix para 404 no Vercel Edge (output directory explícito)
 - [x] `web/src/middleware.ts` — try/catch para evitar 404 quando Supabase inacessível no Edge
 
+### E-mail de credenciais ✅
+- [x] `api/src/services/mailer.ts` — template HTML profissional com cabeçalho magenta, bloco de credenciais e botão de acesso
+- [x] Integrado ao `POST /professionals` — dispara ao cadastrar profissional (fire-and-forget)
+- [x] Provedor: SendGrid HTTP API (Railway bloqueia portas SMTP; Gmail como sender)
+- [x] Seção WhatsApp removida da tela `/admin/configuracoes`
+- [ ] **Pendência:** e-mail cai na caixa de spam — causa: usar `@gmail.com` como remetente via SendGrid sem domínio verificado. Solução: registrar domínio próprio (ex: `.com.br`, ~R$40/ano no Registro.br), verificar no SendGrid e atualizar `SENDGRID_FROM`
+
 ### Entrega
 - [ ] Sessão de walkthrough com a cliente (fluxo admin + profissional)
-- [ ] Admin cadastra todos os profissionais, envia senhas via WhatsApp
+- [ ] Admin cadastra todos os profissionais (credenciais chegam por e-mail automaticamente)
 - [ ] Treinamento: fazer reserva, cancelar, ver bloqueios, gerar relatório
 
 **Critério de aceite:** Sistema no ar, cliente consegue operar sem assistência técnica.
@@ -216,7 +223,7 @@ Ajustes identificados durante uso real do sistema no celular:
 **Status:** Planejada
 **Estimativa:** 1–2 dias
 
-**Contexto:** WhatsApp serve apenas para envio de credenciais. Notificações operacionais (reservas, cancelamentos) acontecem dentro do próprio sistema.
+**Contexto:** Credenciais de acesso são enviadas por e-mail (SendGrid) ao cadastrar profissional. WhatsApp (Baileys) serve para notificações operacionais (confirmação de reserva, cancelamento, lembrete). Notificações in-app são o terceiro canal — entregues dentro do sistema via Supabase Realtime.
 
 ### Quem recebe o quê
 | Gatilho | Destinatário |

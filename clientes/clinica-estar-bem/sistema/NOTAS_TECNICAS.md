@@ -426,6 +426,25 @@ return () => { supabase.removeChannel(channel) }
 
 ---
 
+## Railway — E-mail (SMTP bloqueado)
+
+Railway bloqueia portas SMTP de saída (25, 465, 587) em todos os planos para prevenção de spam. Nodemailer com SMTP falha com `ETIMEDOUT` na conexão.
+
+**Solução aplicada:** SendGrid HTTP API via `@sendgrid/mail` — usa HTTPS, não é afetado pelo bloqueio de portas.
+
+**Variáveis de ambiente necessárias:**
+```
+SENDGRID_API_KEY=SG.xxxx
+SENDGRID_FROM=remetente@dominio.com
+```
+
+**Problema conhecido — e-mail na caixa de spam:**
+Usar `@gmail.com` como remetente via SendGrid faz o e-mail cair em spam. O Gmail não autoriza o SendGrid como servidor legítimo para endereços `@gmail.com` (falha SPF/DKIM).
+
+**Solução definitiva:** registrar um domínio próprio (ex: `nucleoestarbem.com.br`, ~R$40/ano no Registro.br), verificar no SendGrid (Settings → Domain Authentication) e atualizar `SENDGRID_FROM` para `noreply@dominio.com`. O domínio também serve para URL própria do sistema (hoje em subdomínio Vercel/Railway).
+
+---
+
 ## CSS — SVG com fundo branco sobre fundo branco
 
 **Problema:** Logos em SVG com fundo branco embutido ficam com retângulo branco visível quando o background da página também é branco/claro.
